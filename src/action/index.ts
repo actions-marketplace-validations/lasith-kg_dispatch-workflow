@@ -1,88 +1,17 @@
 import * as core from '@actions/core'
-
-const WORKFLOW_TIMEOUT_SECONDS = 30
-
-/**
- * action.yml definition.
- */
-export interface ActionConfig {
-  /**
-   * The method that will be used for dispatching GitHub workflows: repository_dispatch,
-   * workflow_dispatch
-   */
-  dispatchMethod: DispatchMethod
-
-  /**
-   * Repository of the workflow to dispatch
-   */
-  repo: string
-
-  /**
-   * Owner of the given repository.
-   */
-  owner: string
-
-  /**
-   * GitHub API token for making requests.
-   */
-  token: string
-
-  /**
-   * If the selected method is workflow_dispatch, the git reference for the workflow.
-   * The reference can be a branch or tag name.
-   */
-  ref?: string
-
-  /**
-   * If the selected dispatch method is workflow_dispatch, the ID or the workflow file name to dispatch
-   */
-  workflow?: string | number
-
-  /**
-   * If the selected dispatch method is repository_dispatch, what event type will be triggered
-   * in the repository.
-   */
-  eventType?: string
-
-  /**
-   * A JSON object that contains extra information that will be provided to the dispatch call
-   */
-  workflowInputs: ActionWorkflowInputs
-
-  /**
-   * A flag to enable the discovery of the Run ID from the dispatched workflow.
-   */
-  discover: boolean
-
-  /**
-   * Time until giving up on the discovery of the dispatched workflow and corresponding Run ID
-   */
-  discoverTimeoutSeconds: number
-}
-
-interface ActionWorkflowInputs {
-  [input: string]: string
-}
-
-export enum DispatchMethod {
-  RepositoryDispatch = 'repository_dispatch',
-  WorkflowDispatch = 'workflow_dispatch'
-}
-
-export enum ActionOutputs {
-  RunId = 'run-id',
-  RunUrl = 'run-url'
-}
+import {
+  ActionConfig,
+  ActionWorkflowInputs,
+  DispatchMethod,
+  ExponentialBackoff
+} from './action.types'
+import {BackoffOptions} from 'exponential-backoff'
 
 function getNumberFromValue(value: string): number | undefined {
-  if (value === '') {
-    return undefined
-  }
-
   try {
-    const num = parseInt(value)
+    const num = parseFloat(value)
     if (isNaN(num)) {
-      throw new Error('Parsed value is NaN')
+      throw new Error(`${value}: Parsed value is NaN`)
     }
     return num
   } catch {
@@ -117,10 +46,7 @@ Expected Type: string
     }
     return parsedWorkflowInputs
   } catch (error) {
-    core.error('Failed to parse workflow_inputs JSON')
-    if (error instanceof Error) {
-      error.stack && core.debug(error.stack)
-    }
+    core.error('Failed to parse input: workflow_inputs')
     throw error
   }
 }
@@ -139,10 +65,7 @@ Current Value: ${dispatchMethod}
 `)
     }
   } catch (error) {
-    core.error(`Failed to parse dispatch-method`)
-    if (error instanceof Error) {
-      error.stack && core.debug(error.stack)
-    }
+    core.error(`Failed to parse input: dispatch-method`)
     throw error
   }
 }
@@ -162,10 +85,7 @@ A valid git reference must be provided to the 'ref' input, if using the workflow
 Can be formatted as 'main' or 'refs/heads/main'`)
     }
   } catch (error) {
-    core.error(`Failed to parse ref`)
-    if (error instanceof Error) {
-      error.stack && core.debug(error.stack)
-    }
+    core.error(`Failed to parse input: ref`)
     throw error
   }
 
@@ -184,10 +104,7 @@ An event-type must be provided to the 'event-type' input, if using the repositor
 The 'event-type' input is not supported for the workflow_dispatch method and must be ignored.`)
     }
   } catch (error) {
-    core.error(`Failed to parse event-type`)
-    if (error instanceof Error) {
-      error.stack && core.debug(error.stack)
-    }
+    core.error(`Failed to parse input: event-type`)
     throw error
   }
 
@@ -209,7 +126,7 @@ A workflow file name or ID must be provided to the 'workflow' input, if using th
 The 'workflow' input is not supported for the repository_dispatch method and must be ignored.`)
     }
   } catch (error) {
-    core.error(`Failed to parse workflow`)
+    core.error(`Failed to parse input: workflow`)
     if (error instanceof Error) {
       error.stack && core.debug(error.stack)
     }
@@ -235,8 +152,24 @@ export function getConfig(): ActionConfig {
     eventType: getEventType(dispatchMethod),
     workflowInputs: getWorkflowInputs(dispatchMethod),
     discover: core.getBooleanInput('discover'),
-    discoverTimeoutSeconds:
-      getNumberFromValue(core.getInput('discover-timeout-seconds')) ||
-      WORKFLOW_TIMEOUT_SECONDS
+    startingDelay:
+      getNumberFromValue(core.getInput('starting-delay-ms')) ||
+      ExponentialBackoff.StartingDelay,
+    maxAttempts:
+      getNumberFromValue(core.getInput('max-attempts')) ||
+      ExponentialBackoff.MaxAttempts,
+    timeMultiple:
+      getNumberFromValue(core.getInput('time-multiple')) ||
+      ExponentialBackoff.TimeMultiple
   }
 }
+
+export function getBackoffOptions(config: ActionConfig): BackoffOptions {
+  return {
+    timeMultiple: config.timeMultiple,
+    numOfAttempts: config.maxAttempts,
+    startingDelay: config.startingDelay
+  }
+}
+
+export * from './action.types'

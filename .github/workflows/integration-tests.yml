@@ -3,8 +3,7 @@ name: Integration Tests
 run-name: >
   Integration Tests [${{
     github.event.client_payload.distinct_id &&
-    github.event.client_payload.distinct_id ||
-    inputs.distinct_id && inputs.distinct_id || 'N/A' }}]
+    github.event.client_payload.distinct_id || 'N/A' }}]
 
 on:
   repository_dispatch:
@@ -12,17 +11,32 @@ on:
       - repository-dispatch
   workflow_dispatch:
     inputs:
-      distinct_id:
-        description: "Distinct ID"
-        required: false
-      placeholder:
-        description: "Placeholder Input"
-        required: false
-        default: 'placeholder'
+      string-type:
+        description: An input of type 'String'
+        default: placeholder
+        type: string
+      number-type:
+        description: An input of type 'Number'
+        default: 1
+        type: number
+      boolean-type:
+        description: An input of type 'Boolean'
+        default: true
+        type: boolean
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Echo Hello World
-        run: echo "Hello World 👋"
+      - name: Validate workflow_dispatch
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "${{ inputs.string-type }}"
+          if [[ "${{ inputs.number-type }}" -gt -1 ]]; then echo "🟢"; fi
+          if [[ "${{ inputs.boolean-type }}" == "true" ]]; then echo "🟢"; fi
+      - name: Validate repository_dispatch
+        if: github.event_name == 'repository_dispatch'
+        run: |
+          echo "${{ github.event.client_payload.string-type }}"
+          if [[ "${{ github.event.client_payload.nested.number-type }}" -gt -1 ]]; then echo "🟢"; fi
+          if [[ "${{ github.event.client_payload.nested.boolean-type }}" == "true" ]]; then echo "🟢"; fi

@@ -16,7 +16,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Need history for changelog generation
           token: "${{ secrets.ACTIONS_BOT_TOKEN }}"
@@ -26,30 +26,25 @@ jobs:
         run: |
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-      - name: Set Node.js lts
-        uses: actions/setup-node@v3
-        with:
-          node-version: lts/*
-      - name: Install Dependencies
-        run: npm ci
-      - name: Test
-        id: Test
-        run: npm run test
-      - name: Lint
-        run: npm run lint
-      - name: Format Check
-        run: npm run format-check
-      - name: Build
-        run: npm run build
-        # We need to make sure the checked-in `index.js` actually matches what we expect it to be.
-      - name: Compare the Expected and Actual dist/ Directories
+      - id: nvmrc 
+        name: Extract Node.JS Version
+        shell: bash
         run: |
-          if [ "$(git diff --ignore-space-at-eol dist/ | wc -l)" -gt "0" ]; then
-            echo "Detected uncommitted changes after build.  See status below:"
-            git diff
-            exit 1
-          fi
-        id: diff
+          echo "node-version=$(cat .nvmrc)" >> "${GITHUB_OUTPUT}"
+      - name: Set Node.JS
+        uses: actions/setup-node@v4
+        with:
+          node-version: "${{ steps.nvmrc.outputs.node-version }}"
+      - id: clean-dist
+        shell: bash
+        run: |
+          # Clean the existing dist/ folder so that we only release fresh
+          # compiled code
+          rm -rf dist/
+      - run: |
+          npm ci
+      - run: |
+          npm run all
       - name: Perform Release
         run: |
           npm run release -- \

@@ -36,7 +36,7 @@ steps:
       workflow-inputs: |
         {
           "string-type": "placeholder",
-          "number-type": "1"            // Workaround for 'Number' types
+          "number-type": "1",           // Workaround for 'Number' types
           "boolean-type": "true"        // Workaround for 'Boolean' types
         }
 ```
@@ -59,7 +59,7 @@ steps:
           "string-type": "placeholder",
           "nested": {                    // Supports Nesting
             "number-type": 1,            // Supports Native 'Number' types
-            "boolean-type": true,        // Supports Native 'Boolean' types
+            "boolean-type": true         // Supports Native 'Boolean' types
           }
         }
 ```
@@ -132,7 +132,6 @@ steps:
     with:
       ...
       discover: true
-      discover-timeout-seconds: 30  # Optional: Default to 30 seconds
   - id: echo-run-id-url
     name: "Echo Run ID and Run URL"
     run: |
@@ -205,18 +204,20 @@ The below table shows the neccessary permissions for all the unique combinations
 
 # Inputs
 
-| Name                       | Description                                                                                                                           | Required      | Default |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------- |
-| `dispatch-method`          | The method that will be used for dispatching GitHub workflows: `repository_dispatch`, `workflow_dispatch`                             | `true`        |         |
-| `repo`                     | Repository of the workflow to dispatch                                                                                                | `true`        |         |
-| `owner`                    | Owner of the given repository                                                                                                         | `true`        |         |
-| `token`                    | GitHub API token for making API requests                                                                                              | `true`        |         |
-| `ref`                      | If the selected dispatch method is `workflow_dispatch`, the git reference for the workflow. The reference can be a branch or tag name | `conditional` |         |
-| `workflow`                 | If the selected dispatch method is `workflow_dispatch`, the ID or the workflow file name to dispatch                                  | `conditional` |         |
-| `event-type`               | If the selected dispatch method is `repository_dispatch`, what event type will be triggered in the repository.                        | `conditional` |         |
-| `workflow-inputs`          | A JSON object that contains extra information that will be provided to the dispatch call                                              | `false`       | `'{}'`  |
-| `discover`                 | A flag to enable the discovery of the Run ID from the dispatched workflow                                                             | `false`       | `false` |
-| `discover-timeout-seconds` | Time until giving up on the discovery of the dispatched workflow and corresponding Run ID                                             | `false`       | `30`    |
+| Name                | Description                                                                                                                           | Required      | Default |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------- |
+| `dispatch-method`   | The method that will be used for dispatching GitHub workflows: `repository_dispatch`, `workflow_dispatch`                             | `true`        |         |
+| `repo`              | Repository of the workflow to dispatch                                                                                                | `true`        |         |
+| `owner`             | Owner of the given repository                                                                                                         | `true`        |         |
+| `token`             | GitHub API token for making API requests                                                                                              | `true`        |         |
+| `ref`               | If the selected dispatch method is `workflow_dispatch`, the git reference for the workflow. The reference can be a branch or tag name | `conditional` |         |
+| `workflow`          | If the selected dispatch method is `workflow_dispatch`, the ID or the workflow file name to dispatch                                  | `conditional` |         |
+| `event-type`        | If the selected dispatch method is `repository_dispatch`, what event type will be triggered in the repository.                        | `conditional` |         |
+| `workflow-inputs`   | A JSON object that contains extra information that will be provided to the dispatch call                                              | `false`       | `'{}'`  |
+| `discover`          | A flag to enable the discovery of the Run ID from the dispatched workflow                                                             | `false`       | `false` |
+| `starting-delay-ms` | The delay, in milliseconds, before executing the function for the first time.                                                         | `false`       | `200`   |
+| `max-attempts`      | The maximum number of times to attempt read-only GitHub API requests.                                                                 | `false`       | `5`     |
+| `time-multiple`     | The `starting-delay-ms` is multiplied by the `time-multiple` to increase the delay between reattempts.                                | `false`       | `2`     |
 
 # Outputs
 
@@ -315,4 +316,25 @@ types must be wrapped in **quotes** to successfully dispatch the workflow.
           "foo": "true",
           "bar: "1"
         }
+```
+
+# Advanced Usage
+
+## Exponential Backoff
+
+When interacting with the GitHub REST API, it's beneficial to handle potential flakiness by employing exponential backoff. This action allows users to customize this behavior through optional parameters, although the default values work well for most scenarios.
+
+- `starting-delay-ms`: The initial delay, in milliseconds, before the first API call attempt.
+- `max-attempts`: The maximum number of times to attempt read-only GitHub API requests.
+- `time-multiple`: The factor by which the `starting-delay-ms` is multiplied for each reattempt, influencing the delay duration.
+
+```yaml
+  - uses: lasith-kg/dispatch-workflow@v1
+    id: custom-backoff
+    name: 'Dispatch with custom exponential backoff parameters'
+    with:
+      ...
+      starting-delay-ms: 150
+      max-attempts: 3
+      time-multiple: 1.5
 ```
