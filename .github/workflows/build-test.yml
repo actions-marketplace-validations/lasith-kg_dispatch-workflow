@@ -145,7 +145,7 @@ jobs:
           discover: true
       - id: verify-repository-dispatch-outcome
         name: Await Run ID ${{ steps.wait-repository-dispatch.outputs.run-id }}
-        uses: codex-/await-remote-run@v1
+        uses: codex-/await-remote-run@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repo: ${{ github.event.repository.name }}
